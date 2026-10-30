@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chọn ROI cục bộ</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { margin: 0; background: Canvas; color: CanvasText; }
+    main { max-width: 980px; margin: 0 auto; padding: 24px; }
+    h1 { margin-top: 0; font-size: 1.5rem; }
+    p, li { line-height: 1.5; }
+    .notice { padding: 12px; border-inline-start: 4px solid #2b6cb0; background: color-mix(in srgb, CanvasText 7%, Canvas); }
+    .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 18px 0; }
+    label { display: grid; gap: 5px; font-weight: 600; }
+    input, textarea, button { font: inherit; }
+    input[type="text"], input[type="file"], textarea { padding: 7px; border: 1px solid color-mix(in srgb, CanvasText 35%, Canvas); border-radius: 4px; background: Canvas; color: CanvasText; }
+    button { padding: 8px 12px; border: 1px solid color-mix(in srgb, CanvasText 45%, Canvas); border-radius: 4px; background: ButtonFace; color: ButtonText; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    canvas { display: block; max-width: 100%; max-height: 70vh; touch-action: none; cursor: crosshair; background: color-mix(in srgb, CanvasText 6%, Canvas); }
+    .canvas-wrap { display: inline-block; border: 1px solid color-mix(in srgb, CanvasText 35%, Canvas); }
+    .result { white-space: pre-wrap; background: color-mix(in srgb, CanvasText 6%, Canvas); padding: 12px; border-radius: 4px; min-height: 3em; }
+    .warning { color: #b54708; font-weight: 600; }
+    .hidden { display: none; }
+    code { font-family: ui-monospace, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Chọn ROI v0.1 trên máy cục bộ</h1>
+    <p class="notice">Ảnh chỉ được mở trong trình duyệt trên máy này. Công cụ không tải, sao chép hoặc gửi ảnh đi đâu.</p>
+
+    <ol>
+      <li>Chọn một ảnh OK tham chiếu, ưu tiên ảnh đầu của burst S01.</li>
+      <li>Kéo chuột tạo một hình chữ nhật chỉ bao phần bề mặt thực sự cần kiểm tra.</li>
+      <li>Loại thảm xanh, mép ngoài, vùng bóng/chói mạnh, logo và lỗ/vít nếu chúng không phải mục tiêu kiểm tra.</li>
+      <li>Không chọn vùng chỉ vì làm chỉ số sáng đẹp hơn; ROI phải đại diện cho vùng sẽ kiểm tra ở mọi ảnh sau.</li>
+    </ol>
+
+    <div class="controls">
+      <label>Ảnh OK tham chiếu
+        <input id="image-file" type="file" accept="image/jpeg,.jpg,.jpeg">
+      </label>
+      <label>Phiên bản ROI
+        <input id="roi-version" type="text" value="ROI-v0.1" maxlength="64">
+      </label>
+      <button id="clear-roi" type="button" disabled>Xóa vùng đã chọn</button>
+    </div>
+
+    <p id="status" aria-live="polite">Chưa chọn ảnh.</p>
+    <div id="canvas-wrap" class="canvas-wrap hidden">
+      <canvas id="image-canvas" aria-label="Ảnh tham chiếu để kéo chọn ROI"></canvas>
+    </div>
+
+    <h2>Tọa độ theo pixel của ảnh gốc</h2>
+    <div id="roi-result" class="result" aria-live="polite">Chưa có ROI.</div>
+    <p id="roi-warning" class="warning" aria-live="polite"></p>
+    <div class="controls">
+      <button id="copy-coordinates" type="button" disabled>Sao chép x,y,width,height</button>
+      <button id="download-json" type="button" disabled>Tải ROI JSON</button>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      const fileInput = document.getElementById('image-file');
+      const versionInput = document.getElementById('roi-version');
+      const canvas = document.getElementById('image-canvas');
+      const context = canvas.getContext('2d');
+      const canvasWrap = document.getElementById('canvas-wrap');
+      const status = document.getElementById('status');
+      const result = document.getElementById('roi-result');
+      const warning = document.getElementById('roi-warning');
+      const clearButton = document.getElementById('clear-roi');
+      const copyButton = document.getElementById('copy-coordinates');
+      const downloadButton = document.getElementById('download-json');
+
+      const image = new Image();
+      let fileName = '';
+      let scale = 1;
+      let selection = null;
+      let dragStart = null;
+      let isDragging = false;
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function normalizedRect(start, end) {
+        const x = Math.min(start.x, end.x);
+        const y = Math.min(start.y, end.y);
+        return {
+          x,
+          y,
+          width: Math.max(0, Math.abs(end.x - start.x)),
+          height: Math.max(0, Math.abs(end.y - start.y)),
+        };
+      }
+
+      function draw() {
+        if (!image.naturalWidth || !image.naturalHeight) return;
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        if (!selection || selection.width === 0 || selection.height === 0) return;
+
+        const x = selection.x * scale;
+        const y = selection.y * scale;
+        const width = selection.width * scale;
+        const height = selection.height * scale;
+        context.fillStyle = 'rgba(0, 0, 0, 0.36)';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(
+          image,
+          selection.x,
+          selection.y,
+          selection.width,
+          selection.height,
+          x,
+          y,
+          width,
+          height,
+        );
+        context.strokeStyle = '#e53e3e';
+        context.lineWidth = 3;
+        context.strokeRect(x, y, width, height);
+      }
+
+      function updateResult() {
+        const hasSelection = selection && selection.width >= 1 && selection.height >= 1;
+        clearButton.disabled = !hasSelection;
+        copyButton.disabled = !hasSelection;
+        downloadButton.disabled = !hasSelection;
+        warning.textContent = '';
+        if (!hasSelection) {
+          result.textContent = 'Chưa có ROI.';
+          return;
+        }
+        const { x, y, width, height } = selection;
+        result.textContent = `x=${x}, y=${y}, width=${width}, height=${height}\n` +
+          `Kích thước ROI: ${width} × ${height} px | Ảnh gốc: ${image.naturalWidth} × ${image.naturalHeight} px`;
+        if (width < 256 || height < 256) {
+          warning.textContent = 'ROI khá nhỏ. Chỉ giữ nó nếu vẫn bao phủ đúng vùng kiểm tra thực tế.';
+        }
+      }
+
+      function pointFromEvent(event) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: clamp(Math.round((event.clientX - rect.left) * image.naturalWidth / rect.width), 0, image.naturalWidth),
+          y: clamp(Math.round((event.clientY - rect.top) * image.naturalHeight / rect.height), 0, image.naturalHeight),
+        };
+      }
+
+      function setCanvasSize() {
+        const maxWidth = Math.min(860, Math.max(320, window.innerWidth - 70));
+        const maxHeight = Math.min(760, Math.max(420, window.innerHeight - 260));
+        scale = Math.min(maxWidth / image.naturalWidth, maxHeight / image.naturalHeight, 1);
+        canvas.width = Math.round(image.naturalWidth * scale);
+        canvas.height = Math.round(image.naturalHeight * scale);
+      }
+
+      function roiPayload() {
+        const roiVersion = versionInput.value.trim() || 'ROI-v0.1';
+        return {
+          schema_version: 'roi-spec-v0.1',
+          status: 'candidate_pending_review',
+          roi_version: roiVersion,
+          reference_image_file: fileName,
+          image_size_px: { width: image.naturalWidth, height: image.naturalHeight },
+          crop: selection,
+          inspection_mask: { type: 'rectangle_crop_only', version: roiVersion },
+          ignore_mask: 'TBD_if_structures_must_be_excluded',
+          registration_method: 'none_pending_alignment_validation',
+          note: 'ROI was drawn on one OK reference image. Apply the same rule to all later images after alignment; do not choose it from test defects.',
+        };
+      }
+
+      async function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return;
+        }
+        const helper = document.createElement('textarea');
+        helper.value = text;
+        helper.style.position = 'fixed';
+        helper.style.opacity = '0';
+        document.body.appendChild(helper);
+        helper.select();
+        document.execCommand('copy');
+        helper.remove();
+      }
+
+      fileInput.addEventListener('change', () => {
+        const [file] = fileInput.files;
+        if (!file) return;
+        fileName = file.name;
+        selection = null;
+        const reader = new FileReader();
+        reader.onload = () => { image.src = reader.result; };
+        reader.readAsDataURL(file);
+      });
+
+      image.addEventListener('load', () => {
+        setCanvasSize();
+        canvasWrap.classList.remove('hidden');
+        status.textContent = `Đã mở cục bộ ${fileName}: ${image.naturalWidth} × ${image.naturalHeight} px. Kéo chuột để chọn ROI.`;
+        draw();
+        updateResult();
+      });
+
+      canvas.addEventListener('pointerdown', (event) => {
+        if (!image.naturalWidth) return;
+        dragStart = pointFromEvent(event);
+        selection = { x: dragStart.x, y: dragStart.y, width: 0, height: 0 };
+        isDragging = true;
+        canvas.setPointerCapture(event.pointerId);
+        draw();
+        updateResult();
+      });
+
+      canvas.addEventListener('pointermove', (event) => {
+        if (!isDragging || !dragStart) return;
+        selection = normalizedRect(dragStart, pointFromEvent(event));
+        draw();
+        updateResult();
+      });
+
+      function finishDrag(event) {
+        if (!isDragging) return;
+        isDragging = false;
+        if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+        if (selection && (selection.width < 1 || selection.height < 1)) selection = null;
+        draw();
+        updateResult();
+      }
+
+      canvas.addEventListener('pointerup', finishDrag);
+      canvas.addEventListener('pointercancel', finishDrag);
+
+      clearButton.addEventListener('click', () => {
+        selection = null;
+        draw();
+        updateResult();
+        status.textContent = 'Đã xóa ROI. Kéo chuột để chọn lại.';
+      });
+
+      copyButton.addEventListener('click', async () => {
+        if (!selection) return;
+        const text = `${selection.x},${selection.y},${selection.width},${selection.height}`;
+        try {
+          await copyText(text);
+          status.textContent = `Đã sao chép tọa độ: ${text}`;
+        } catch (error) {
+          status.textContent = 'Không thể sao chép tự động. Hãy ghi lại bốn số đang hiển thị.';
+        }
+      });
+
+      downloadButton.addEventListener('click', () => {
+        if (!selection) return;
+        const content = JSON.stringify(roiPayload(), null, 2);
+        const blob = new Blob([content], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${versionInput.value.trim() || 'ROI-v0.1'}.json`;
+        link.click();
+        window.setTimeout(() => URL.revokeObjectURL(link.href), 250);
+        status.textContent = 'Đã tạo ROI JSON. Trước khi dùng cho dataset, cần kiểm tra lại ROI trên burst S01.';
+      });
+
+      window.addEventListener('resize', () => {
+        if (!image.naturalWidth) return;
+        setCanvasSize();
+        draw();
+      });
+    })();
+  </script>
+</body>
+</html>

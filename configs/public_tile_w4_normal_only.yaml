@@ -1,0 +1,19 @@
+schema_version: "1.0"
+experiment_id: "w4_tile_patchcore_normal_only"
+baseline_run: "runs/w2_repro_patchcore_20261012"
+model: "Patchcore"
+manifest: "data/manifests/mvtec_tile_w1_seed42.csv"
+calibration_split: "calibration"
+test_split: "test"
+calibration_image_count: 46
+test_image_count: 117
+image_decision:
+  quantile: 0.95
+  method: "nearest_rank"
+  alert_when: "score > threshold"
+postprocessing:
+  method: "fixed_3x3_binomial"
+  kernel_1d: [1, 2, 1]
+  edge_mode: "replicate"
+  image_score: "maximum_of_smoothed_anomaly_map"
+selection_policy: "No test score, label, mask or heatmap may select these parameters."

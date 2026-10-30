@@ -1,0 +1,79 @@
+{
+  "schema_version": "roi-spec-v0.1",
+  "roi_version": "ROI-v0.1",
+  "status": "locked_for_s01_s02_qc_passed_registration_tbd",
+  "reference": {
+    "capture_session": "20261005-S01",
+    "reference_image_file": "20261005_193820.jpg",
+    "reference_image_sha256": "316a73bc7ff662cbd0f76a609a71b3bf67fa2a4688f57bc9e8fa9cc7134dd40e",
+    "image_width_px": 3000,
+    "image_height_px": 4000
+  },
+  "crop_px": {
+    "x": 0,
+    "y": 0,
+    "width": 3000,
+    "height": 1957
+  },
+  "evaluated_alternatives": [
+    {
+      "candidate_id": "ROI-v0.2-candidate",
+      "crop_px": {
+        "x": 0,
+        "y": 0,
+        "width": 3000,
+        "height": 2665
+      },
+      "artifact_dir": "artifacts/capture_qc/20261005-S01-roi-v0.2-candidate",
+      "analysis_status": "PASS",
+      "median_luminance_sample_sd": 0.085744,
+      "grid_cv_percent_mean": 15.443851,
+      "grid_cv_percent_sample_sd": 0.020643,
+      "selection_status": "not_selected",
+      "selection_note": "The wider candidate has lower relative spatial uniformity than ROI-v0.1 within the same S01 preflight. This comparison does not establish a universal acceptance threshold."
+    }
+  ],
+  "inspection_mask": {
+    "version": "inspection-mask-v0.1",
+    "type": "rectangle_crop_all_pixels_inside",
+    "file": null
+  },
+  "ignore_mask": {
+    "version": "ignore-mask-v0.1",
+    "type": "none",
+    "file": null,
+    "note": "Add a versioned mask later only if valid structures inside the crop must be excluded."
+  },
+  "registration": {
+    "method": "fixed_pixel_crop_0_0_3000_1957",
+    "note": "The researcher confirmed this canonical crop on 2026-10-07. S01 and S02 technical QC passed, but automatic feature matching did not provide enough correspondences to verify cross-session geometry. Use a non-sensitive marker or another documented registration method if framing may move."
+  },
+  "qc_evidence": {
+    "artifact_dir": "artifacts/capture_qc/20261005-S01-roi-v0.1-canonical",
+    "analysis_status": "PASS",
+    "settings_consistent": true,
+    "manual_exif_all_confirmed": true,
+    "median_luminance_mean": 169.743768,
+    "median_luminance_sample_sd": 0.074573,
+    "grid_cv_percent_mean": 8.886609,
+    "grid_cv_percent_sample_sd": 0.012289
+  },
+  "cross_session_qc": {
+    "capture_session": "20261006-S02",
+    "artifact_dir": "artifacts/capture_qc/20261006-S02-roi-v0.1-canonical",
+    "analysis_status": "PASS",
+    "settings_signature_matches_s01": true,
+    "manual_exif_all_confirmed": true,
+    "median_luminance_mean": 171.78708,
+    "median_luminance_sample_sd": 0.069749,
+    "grid_cv_percent_mean": 7.203737,
+    "grid_cv_percent_sample_sd": 0.021587,
+    "median_luminance_relative_change_percent_vs_s01": 1.203763,
+    "geometry_registration_status": "TBD_insufficient_local_feature_correspondences"
+  },
+  "scope": {
+    "selection_basis": "OK reference image and S01/S02 preflight only; canonical coordinate confirmed by researcher on 2026-10-07",
+    "not_selected_from": ["test_data", "defect_location"],
+    "independent_sample_count_contribution": 0
+  }
+}

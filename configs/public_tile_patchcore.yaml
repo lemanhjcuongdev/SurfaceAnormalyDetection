@@ -1,0 +1,28 @@
+schema_version: "1.0"
+experiment_id: "w1_mvtec_tile_patchcore"
+dataset:
+  name: "mvtec_ad"
+  category: "tile"
+  manifest: "data/manifests/mvtec_tile_w1_seed42.csv"
+  input_size: [256, 256]
+  model_split: "model"
+  calibration_split: "calibration"
+  test_split: "test"
+run:
+  seed: 42
+  batch_size: 1
+  num_workers: 0
+  preferred_device: "cuda"
+  allow_cpu_fallback: true
+  raw_outputs_only: true
+model:
+  name: "Patchcore"
+  backbone: "wide_resnet50_2"
+  layers: ["layer2", "layer3"]
+  coreset_sampling_ratio: 0.10
+  num_neighbors: 9
+evaluation:
+  automatic_threshold: false
+  report_metrics: ["image_auroc", "pixel_auroc"]
+  prohibited_w1_metrics: ["accuracy", "f1", "precision", "recall", "fpr", "fnr"]
+

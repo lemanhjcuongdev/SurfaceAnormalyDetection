@@ -1,0 +1,31 @@
+schema_version: "1.0"
+experiment_id: "w6_tile_patchcore_latency_memory"
+protocol_locked_at: "2026-10-27"
+baseline_run: "runs/w2_repro_patchcore_20261012"
+cd_run: "runs/public_w4_cd/20261027-cd-run01"
+manifest: "data/manifests/mvtec_tile_w1_seed42.csv"
+input_split: "test"
+input_order: "sorted_by_image_relative_path"
+labels_read: false
+hardware_id: "acer_nitro_anv15_41"
+devices: ["cuda", "cpu"]
+precision: "float32"
+batch_size: 1
+input_size: [256, 256]
+seed: 42
+warmup_image_count: 10
+measured_passes: 3
+percentile_method: "nearest_rank"
+stages:
+  - "read_decode"
+  - "preprocess_to_device"
+  - "model_forward"
+  - "postprocess_cd_decision"
+  - "heatmap_overlay_png_write"
+memory:
+  gpu: "torch.cuda.max_memory_allocated from before model transfer to end of measurement"
+  ram: "psutil peak working set of the measurement process"
+validity:
+  max_abs_score_difference_to_baseline: 0.01
+  require_ac_power: true
+selection_policy: "Latency/memory results never select model, threshold, ROI or post-processing parameters."

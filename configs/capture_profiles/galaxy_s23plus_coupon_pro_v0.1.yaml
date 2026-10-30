@@ -1,0 +1,98 @@
+# Profile thu ảnh Galaxy S23+. Đây không thay thế metadata của từng ảnh.
+# Các giá trị còn TBD không được suy đoán ngoài bằng chứng preflight.
+capture_profile_id: galaxy-s23plus-coupon-pro-v0.1
+status: roi_v0_1_locked_s01_s02_s03_qc_passed_registration_tbd
+purpose: controlled_surface_patch_validation_not_production_deployment
+data_source: nonconfidential_coupon_or_explicitly_approved_patch_only_surface
+display_name_vi: Galaxy S23+ chụp mảng bề mặt được phép bằng Pro mode
+
+device:
+  manufacturer: Samsung
+  model: Galaxy S23+
+  camera_lens: rear_telephoto_3x
+  resolution_px: "3000x4000"
+  resolution_evidence: observed_preflight_s01
+  resolution_mode: standard_4_to_3
+  high_resolution_50MP_mode: disabled_for_w2_starting_profile
+  orientation: portrait
+  orientation_evidence: observed_preflight_s01
+  displayed_camera_ratio: "3.0x"
+  digital_zoom_ratio: 3.0
+  digital_zoom_evidence: observed_in_exif_preflight_s01
+  flash: disabled
+
+lens_selection:
+  selected: rear_telephoto_3x
+  selection_reason: prevent_whole_product_from_appearing_in_raw_frame
+  prohibited_lenses_or_ratios: [rear_wide_1x, digital_2.0x, digital_2.9x]
+  one_lens_per_capture_session: true
+  full_product_in_raw_frame: prohibited
+  post_capture_crop_counts_as_privacy_control: false
+  note: The 3x telephoto lens is fixed. S01, S02 and S03 recorded a consistent 3000x4000 portrait output. The canonical inspection ROI is ROI-v0.1 at x=0, y=0, width=3000, height=1957; cross-session geometry registration remains TBD.
+
+manual_capture_settings:
+  suggested_starting_iso_telephoto_3x: 100
+  suggested_starting_shutter_speed_s: 1/50
+  suggested_starting_white_balance_k: 5000
+  suggested_starting_focus: manual_adjust_for_maximum_surface_texture_then_lock
+  locked_iso: 100
+  locked_iso_evidence: observed_in_exif_preflight_s01
+  locked_shutter_speed_s: "1/50"
+  locked_shutter_evidence: observed_in_exif_preflight_s01
+  focus: manual_locked
+  focus_ui_value: 0.36
+  focus_evidence: confirmed_by_researcher_20261006
+  focus_ui_value_semantics: phone_camera_app_slider_not_physical_distance
+  locked_white_balance_k: 5000
+  white_balance_evidence: confirmed_by_researcher_20261006
+  exposure_compensation: 0
+  expected_exif_exposure_mode: 1
+  expected_exif_white_balance: 1
+  observed_exif_f_number: 2.4
+  observed_exif_focal_length_mm: 7.0
+  starting_values_are_evidence: false
+  note: S01 confirmed ISO, shutter, WB and manual focus settings. Keep this set unchanged within a session; a lens or setup change requires a new session and preflight.
+
+image_processing:
+  scene_optimizer: disabled_if_available
+  auto_hdr: disabled_if_available
+  beauty_filter_portrait: disabled
+  motion_photo: disabled
+  post_capture_resize_or_enhancement: prohibited_before_raw_archive
+
+physical_setup:
+  camera_mount: tripod_or_phone_clamp_required
+  coupon_placement: marked_fixed_position_on_mat
+  lighting: fixed_artificial_light_without_changing_daylight
+  light_warmup_minutes: 5
+  shutter_release: two_second_timer_or_remote
+  camera_surface_geometry: camera_sensor_plane_parallel_to_inspected_flat_region
+  green_antislip_mat: positional_reference_only_not_photometric_reference
+  green_mat_inside_inspection_roi: prohibited
+
+privacy:
+  capture_only_after_scope_is_explicitly_allowed: true
+  raw_frame_contains_only_authorized_surface_patch: required
+  product_identity_logo_document_people_in_raw_frame: prohibited
+  cloud_camera_backup: disabled
+  location_tag: disabled
+  storage: approved_local_location_only
+
+preflight:
+  reference_image_count: 10
+  latest_reference_image_count: 14
+  capture_role: stability_reference
+  analysis_script: scripts/analyze_capture_stability.py
+  roi: "ROI-v0.1: x=0, y=0, width=3000, height=1957"
+  baseline_rule: median_luminance_mean_plus_minus_3_sample_standard_deviations
+  settings_rule: exif_signature_must_be_identical_within_reference_burst
+  latest_session_id: 20261008-S03
+  latest_result: PASS_configuration_consistency_and_roi_qc_s01_s02_s03
+  latest_roi: ROI-v0.1
+  latest_roi_config: configs/roi/roi_v0.1.json
+  note: Reference bursts are not independent training or test data. The default reference count is 10; S03 used 14 consecutive reference images. ROI-v0.1 was confirmed by the researcher and passed S01/S02/S03 technical QC; use a non-sensitive marker or documented registration method if framing can move between future sessions.
+
+storage:
+  raw_images: approved_local_location_outside_onedrive_and_git
+  generated_qc_artifacts: approved_local_location_or_non_sensitive_report_location
+  raw_image_copy_into_repository: prohibited

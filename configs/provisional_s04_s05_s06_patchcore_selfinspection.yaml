@@ -1,0 +1,37 @@
+# Run thăm dò gộp S04/S05/S06. Không dùng để tính AUROC hay hiệu năng triển khai.
+experiment_id: provisional_s04_s05_s06_patchcore_selfinspection
+
+dataset:
+  input_size: [256, 256]
+  roi_version: roi-v0.1
+  roi: [0, 0, 3000, 1957]
+  source_role: pooled_provisional_normal_candidate
+  input_assumption: all supplied images are normal-only training candidates by researcher direction
+  input_limitations:
+    - S04 contributes one representative from each of 38 three-photo capture groups; the other repeat photos are not independent training inputs.
+    - S05 contributes ten user-confirmed distinct non-overlap regions.
+    - S06 contributes 35 user-directed normal candidates, but their physical relationship is not verified and EXIF records automatic exposure.
+    - No independent test split, confirmed NG label, defect mask, or threshold is present.
+    - ROI-v0.1 is reused as a fixed pre-model crop and is not validated for every surface geometry.
+
+model:
+  name: PatchCore-compatible
+  implementation: local_timm_feature_memory_bank
+  backbone: wide_resnet50_2.racm_in1k
+  feature_layers: [layer2, layer3]
+  coreset_sampling_ratio: 0.10
+  coreset_method: uniform_seeded_sample
+  num_neighbors: 9
+  pretrained: true
+
+run:
+  seed: 42
+  batch_size: 1
+  preferred_device: cuda
+  allow_cpu_fallback: true
+  heatmap_side_px: 512
+
+evaluation:
+  mode: self_inspection_only
+  automatic_threshold: false
+  metrics: not_computed_no_independent_test_or_confirmed_ng_labels
