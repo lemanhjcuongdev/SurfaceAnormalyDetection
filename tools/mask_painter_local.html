@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vẽ mask lỗi cục bộ</title>
+<style>
+  :root { --bg:#f4f4f2; --panel:#ffffff; --ink:#1d1d1b; --muted:#6b6b66; --line:#d8d8d2; --accent:#c0392b; --ok:#1e7d4f; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.4 system-ui, sans-serif; }
+  .app { display:grid; grid-template-columns: 300px 1fr; height:100vh; }
+  aside { background:var(--panel); border-right:1px solid var(--line); padding:12px; overflow:auto; }
+  h1 { font-size:16px; margin:0 0 8px; }
+  h2 { font-size:13px; margin:14px 0 6px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  button, select, input[type=file] { font:inherit; }
+  button { border:1px solid var(--line); background:#fafaf8; border-radius:6px; padding:5px 9px; cursor:pointer; }
+  button.active { background:var(--ink); color:#fff; border-color:var(--ink); }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:4px 0; }
+  .note { color:var(--muted); font-size:12px; }
+  ul.files { list-style:none; padding:0; margin:0; max-height:32vh; overflow:auto; border:1px solid var(--line); border-radius:6px; }
+  ul.files li { padding:5px 8px; cursor:pointer; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:6px; }
+  ul.files li.current { background:#efeee9; font-weight:600; }
+  ul.files li .tag { font-size:11px; color:var(--ok); }
+  main { position:relative; overflow:hidden; }
+  canvas#view { position:absolute; inset:0; width:100%; height:100%; cursor:none; background:#2b2b2b; }
+  #status { position:absolute; left:8px; bottom:8px; background:rgba(0,0,0,.65); color:#fff; padding:4px 8px; border-radius:4px; font-size:12px; }
+  #warn { position:absolute; left:8px; top:8px; right:8px; background:#fff3cd; color:#5c4400; padding:6px 10px; border-radius:4px; display:none; }
+  kbd { border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 4px; font-size:11px; background:#fafaf8; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>Vẽ mask lỗi (cục bộ)</h1>
+    <p class="note">Ảnh chỉ được đọc trong trình duyệt trên máy này, không tải lên đâu cả. Vùng lỗi tô kín; mask xuất ra là PNG đen/trắng cùng kích thước ảnh đã xoay theo EXIF.</p>
+
+    <h2>1. Ảnh và thư mục lưu</h2>
+    <div class="row"><input type="file" id="pick" accept="image/jpeg,image/png" multiple></div>
+    <div class="row"><button id="pickDir">Chọn thư mục lưu mask</button></div>
+    <div class="note" id="dirInfo">Chưa chọn thư mục: mask sẽ tải về thư mục Downloads.</div>
+    <ul class="files" id="files"></ul>
+
+    <h2>2. Công cụ</h2>
+    <div class="row">
+      <button data-tool="brush" class="active">Cọ <kbd>B</kbd></button>
+      <button data-tool="erase">Tẩy <kbd>E</kbd></button>
+      <button data-tool="poly">Đa giác <kbd>P</kbd></button>
+    </div>
+    <div class="row">Cỡ cọ <input type="range" id="size" min="4" max="400" value="60"> <span id="sizeVal">60</span> px</div>
+    <div class="row">Độ đậm lớp mask <input type="range" id="alpha" min="10" max="90" value="45"></div>
+    <div class="row"><label><input type="checkbox" id="showRoi" checked> Hiện khung ROI-v0.1</label></div>
+    <div class="row"><label><input type="checkbox" id="showMask" checked> Hiện mask <kbd>H</kbd></label></div>
+    <div class="row">
+      <button id="undo">Hoàn tác <kbd>Ctrl+Z</kbd></button>
+      <button id="clear">Xóa hết</button>
+      <button id="fit">Vừa khung <kbd>F</kbd></button>
+    </div>
+    <div class="row"><button id="loadMask">Mở mask cũ để sửa</button><input type="file" id="maskFile" accept="image/png" hidden></div>
+
+    <h2>3. Lưu</h2>
+    <div class="row">
+      <button id="save" class="primary">Lưu mask <kbd>Ctrl+S</kbd></button>
+      <button id="prev">◀ Trước</button>
+      <button id="next">Sau ▶</button>
+    </div>
+    <div class="note" id="saveInfo"></div>
+
+    <h2>Thao tác</h2>
+    <p class="note">
+      Cuộn chuột: phóng to/thu nhỏ quanh con trỏ. Kéo chuột phải hoặc giữ <kbd>Space</kbd> + kéo: di chuyển ảnh.<br>
+      Đa giác: bấm từng điểm quanh vết lỗi, <kbd>Enter</kbd> hoặc nhấp đúp để tô kín, <kbd>Esc</kbd> để hủy.<br>
+      <kbd>[</kbd> <kbd>]</kbd>: đổi cỡ cọ. Tên file mask: <code>&lt;tên ảnh&gt;_mask.png</code>.
+    </p>
+  </aside>
+  <main>
+    <canvas id="view"></canvas>
+    <div id="warn"></div>
+    <div id="status">Chọn ảnh để bắt đầu.</div>
+  </main>
+</div>
+<script>
+"use strict";
+const ROI = { x: 0, y: 0, w: 3000, h: 1957 };
+const UNDO_LIMIT = 15;
+const view = document.getElementById("view");
+const ctx = view.getContext("2d");
+const $ = (id) => document.getElementById(id);
+
+const state = {
+  files: [], index: -1, saved: new Set(), dirHandle: null,
+  image: null, mask: null, maskCtx: null, undo: [],
+  scale: 1, ox: 0, oy: 0, tool: "brush", size: 60, alpha: 0.45,
+  drawing: false, panning: false, spaceDown: false, last: null, poly: [], cursor: null, dirty: false,
+};
+
+function resize() {
+  const r = view.getBoundingClientRect();
+  view.width = Math.round(r.width * devicePixelRatio);
+  view.height = Math.round(r.height * devicePixelRatio);
+  render();
+}
+window.addEventListener("resize", resize);
+
+function toImage(px, py) { // client px -> image coords
+  const r = view.getBoundingClientRect();
+  const x = (px - r.left) * devicePixelRatio, y = (py - r.top) * devicePixelRatio;
+  return { x: (x - state.ox) / state.scale, y: (y - state.oy) / state.scale };
+}
+
+function fit() {
+  if (!state.image) return;
+  const s = Math.min(view.width / state.image.width, view.height / state.image.height) * 0.98;
+  state.scale = s;
+  state.ox = (view.width - state.image.width * s) / 2;
+  state.oy = (view.height - state.image.height * s) / 2;
+  render();
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, view.width, view.height);
+  if (!state.image) return;
+  ctx.setTransform(state.scale, 0, 0, state.scale, state.ox, state.oy);
+  ctx.imageSmoothingEnabled = state.scale < 1;
+  ctx.drawImage(state.image, 0, 0);
+  if ($("showMask").checked) {
+    ctx.globalAlpha = state.alpha;
+    ctx.drawImage(state.mask, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+  const lw = 2 / state.scale;
+  if ($("showRoi").checked && state.image.width === 3000) {
+    ctx.setLineDash([12 / state.scale, 8 / state.scale]);
+    ctx.strokeStyle = "#ffd400"; ctx.lineWidth = lw;
+    ctx.strokeRect(ROI.x, ROI.y, ROI.w, ROI.h);
+    ctx.setLineDash([]);
+  }
+  if (state.poly.length) {
+    ctx.strokeStyle = "#00e5ff"; ctx.lineWidth = lw;
+    ctx.beginPath();
+    state.poly.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+    if (state.cursor) ctx.lineTo(state.cursor.x, state.cursor.y);
+    ctx.stroke();
+    for (const p of state.poly) { ctx.fillStyle = "#00e5ff"; ctx.fillRect(p.x - 3 * lw, p.y - 3 * lw, 6 * lw, 6 * lw); }
+  }
+  if (state.cursor && state.tool !== "poly") {
+    ctx.strokeStyle = state.tool === "erase" ? "#ffffff" : "#ff5a4f"; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.arc(state.cursor.x, state.cursor.y, state.size / 2, 0, Math.PI * 2); ctx.stroke();
+  }
+  if (state.cursor && state.tool === "poly") {
+    ctx.strokeStyle = "#00e5ff"; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.moveTo(state.cursor.x - 10 * lw, state.cursor.y); ctx.lineTo(state.cursor.x + 10 * lw, state.cursor.y);
+    ctx.moveTo(state.cursor.x, state.cursor.y - 10 * lw); ctx.lineTo(state.cursor.x, state.cursor.y + 10 * lw); ctx.stroke();
+  }
+}
+
+function status() {
+  if (!state.image) return;
+  const f = state.files[state.index];
+  $("status").textContent = `${f.name} · ${state.image.width}×${state.image.height} px · ${Math.round(state.scale * 100)}%` +
+    ` · ${state.tool === "brush" ? "cọ" : state.tool === "erase" ? "tẩy" : "đa giác"} ${state.size}px` + (state.dirty ? " · chưa lưu" : "");
+}
+
+async function pushUndo() {
+  state.undo.push(await createImageBitmap(state.mask));
+  if (state.undo.length > UNDO_LIMIT) state.undo.shift().close();
+}
+
+function undo() {
+  const bmp = state.undo.pop();
+  if (!bmp) return;
+  state.maskCtx.globalCompositeOperation = "copy";
+  state.maskCtx.drawImage(bmp, 0, 0);
+  state.maskCtx.globalCompositeOperation = "source-over";
+  bmp.close(); state.dirty = true; render(); status();
+}
+
+function stroke(a, b) {
+  const m = state.maskCtx;
+  m.globalCompositeOperation = state.tool === "erase" ? "destination-out" : "source-over";
+  m.strokeStyle = m.fillStyle = "#ff2d2d";
+  m.lineWidth = state.size; m.lineCap = m.lineJoin = "round";
+  m.beginPath(); m.moveTo(a.x, a.y); m.lineTo(b.x, b.y); m.stroke();
+  m.globalCompositeOperation = "source-over";
+}
+
+async function closePolygon() {
+  if (state.poly.length < 3) { state.poly = []; render(); return; }
+  await pushUndo();
+  const m = state.maskCtx;
+  m.fillStyle = "#ff2d2d"; m.beginPath();
+  state.poly.forEach((p, i) => i ? m.lineTo(p.x, p.y) : m.moveTo(p.x, p.y));
+  m.closePath(); m.fill();
+  state.poly = []; state.dirty = true; render(); status();
+}
+
+view.addEventListener("contextmenu", (e) => e.preventDefault());
+view.addEventListener("pointerdown", async (e) => {
+  if (!state.image) return;
+  view.setPointerCapture(e.pointerId);
+  if (e.button === 2 || state.spaceDown || e.button === 1) { state.panning = true; state.last = { x: e.clientX, y: e.clientY }; return; }
+  const p = toImage(e.clientX, e.clientY);
+  if (state.tool === "poly") {
+    if (e.detail >= 2) { await closePolygon(); return; }
+    state.poly.push(p); render(); return;
+  }
+  await pushUndo();
+  state.drawing = true; state.last = p; stroke(p, p); state.dirty = true; render(); status();
+});
+view.addEventListener("pointermove", (e) => {
+  if (!state.image) return;
+  if (state.panning) {
+    state.ox += (e.clientX - state.last.x) * devicePixelRatio; state.oy += (e.clientY - state.last.y) * devicePixelRatio;
+    state.last = { x: e.clientX, y: e.clientY }; render(); return;
+  }
+  const p = toImage(e.clientX, e.clientY); state.cursor = p;
+  if (state.drawing) { stroke(state.last, p); state.last = p; }
+  render();
+});
+const endPointer = () => { state.drawing = false; state.panning = false; };
+view.addEventListener("pointerup", endPointer);
+view.addEventListener("pointerleave", () => { state.cursor = null; render(); });
+view.addEventListener("wheel", (e) => {
+  if (!state.image) return;
+  e.preventDefault();
+  const r = view.getBoundingClientRect();
+  const x = (e.clientX - r.left) * devicePixelRatio, y = (e.clientY - r.top) * devicePixelRatio;
+  const k = Math.exp(-e.deltaY * 0.0015);
+  const s = Math.min(8, Math.max(0.02, state.scale * k));
+  state.ox = x - (x - state.ox) * (s / state.scale); state.oy = y - (y - state.oy) * (s / state.scale);
+  state.scale = s; render(); status();
+}, { passive: false });
+
+function setTool(t) {
+  state.tool = t; state.poly = [];
+  document.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("active", b.dataset.tool === t));
+  render(); status();
+}
+document.querySelectorAll("[data-tool]").forEach((b) => b.addEventListener("click", () => setTool(b.dataset.tool)));
+$("size").addEventListener("input", (e) => { state.size = +e.target.value; $("sizeVal").textContent = state.size; render(); status(); });
+$("alpha").addEventListener("input", (e) => { state.alpha = e.target.value / 100; render(); });
+$("showRoi").addEventListener("change", render);
+$("showMask").addEventListener("change", render);
+$("undo").addEventListener("click", undo);
+$("fit").addEventListener("click", fit);
+$("clear").addEventListener("click", async () => {
+  if (!state.image || !confirm("Xóa toàn bộ mask của ảnh này?")) return;
+  await pushUndo(); state.maskCtx.clearRect(0, 0, state.mask.width, state.mask.height); state.dirty = true; render(); status();
+});
+
+window.addEventListener("keydown", async (e) => {
+  if (e.target.tagName === "INPUT" && e.target.type !== "range" && e.target.type !== "checkbox") return;
+  if (e.code === "Space") { state.spaceDown = true; e.preventDefault(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); await save(); return; }
+  if (e.key === "Enter" && state.tool === "poly") await closePolygon();
+  if (e.key === "Escape") { state.poly = []; render(); }
+  const key = e.key.toLowerCase();
+  if (key === "b") setTool("brush");
+  if (key === "e") setTool("erase");
+  if (key === "p") setTool("poly");
+  if (key === "f") fit();
+  if (key === "h") { $("showMask").checked = !$("showMask").checked; render(); }
+  if (e.key === "[" || e.key === "]") {
+    state.size = Math.min(400, Math.max(4, Math.round(state.size * (e.key === "]" ? 1.2 : 1 / 1.2))));
+    $("size").value = state.size; $("sizeVal").textContent = state.size; render(); status();
+  }
+});
+window.addEventListener("keyup", (e) => { if (e.code === "Space") state.spaceDown = false; });
+
+function maskName(file) { return file.name.replace(/\.[^.]+$/, "") + "_mask.png"; }
+
+function listFiles() {
+  const ul = $("files"); ul.innerHTML = "";
+  state.files.forEach((f, i) => {
+    const li = document.createElement("li");
+    li.className = i === state.index ? "current" : "";
+    li.innerHTML = `<span>${f.name}</span><span class="tag">${state.saved.has(f.name) ? "đã lưu" : ""}</span>`;
+    li.addEventListener("click", () => openImage(i));
+    ul.appendChild(li);
+  });
+}
+
+async function openImage(i) {
+  if (state.dirty && !confirm("Mask hiện tại chưa lưu. Bỏ thay đổi và chuyển ảnh?")) return;
+  const file = state.files[i];
+  // EXIF orientation is applied so pixel coordinates match the backend (PIL ImageOps.exif_transpose).
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  state.index = i; state.image = bitmap;
+  state.mask = document.createElement("canvas");
+  state.mask.width = bitmap.width; state.mask.height = bitmap.height;
+  state.maskCtx = state.mask.getContext("2d", { willReadFrequently: false });
+  state.undo.forEach((b) => b.close()); state.undo = []; state.poly = []; state.dirty = false;
+  const warn = $("warn");
+  if (bitmap.width > bitmap.height) {
+    warn.style.display = "block";
+    warn.textContent = `Ảnh đang nằm ngang (${bitmap.width}×${bitmap.height}). Ảnh S23+ chụp dọc phải là 3000×4000 sau khi xoay EXIF; kiểm tra lại trình duyệt trước khi vẽ.`;
+  } else warn.style.display = "none";
+  if (state.dirHandle) await tryLoadExisting(file);
+  listFiles(); fit(); status();
+  $("saveInfo").textContent = "";
+}
+
+async function tryLoadExisting(file) {
+  try {
+    const handle = await state.dirHandle.getFileHandle(maskName(file));
+    await drawMaskFile(await handle.getFile());
+    state.saved.add(file.name);
+    $("saveInfo").textContent = "Đã mở mask có sẵn trong thư mục lưu.";
+  } catch (_) { /* no saved mask yet */ }
+}
+
+async function drawMaskFile(blob) {
+  const bmp = await createImageBitmap(blob);
+  if (bmp.width !== state.mask.width || bmp.height !== state.mask.height) { alert("Mask khác kích thước ảnh, không mở."); return; }
+  const tmp = document.createElement("canvas"); tmp.width = bmp.width; tmp.height = bmp.height;
+  const t = tmp.getContext("2d"); t.drawImage(bmp, 0, 0);
+  const data = t.getImageData(0, 0, tmp.width, tmp.height);
+  const out = state.maskCtx.createImageData(tmp.width, tmp.height);
+  for (let k = 0; k < data.data.length; k += 4) {
+    if (data.data[k] > 127) { out.data[k] = 255; out.data[k + 1] = 45; out.data[k + 2] = 45; out.data[k + 3] = 255; }
+  }
+  state.maskCtx.putImageData(out, 0, 0); render();
+}
+
+function binaryPng() {
+  // Any painted pixel (alpha > 127) becomes 255, everything else 0: strict black/white output.
+  const w = state.mask.width, h = state.mask.height;
+  const src = state.maskCtx.getImageData(0, 0, w, h).data;
+  const out = document.createElement("canvas"); out.width = w; out.height = h;
+  const o = out.getContext("2d"); const img = o.createImageData(w, h);
+  let painted = 0;
+  for (let k = 0; k < src.length; k += 4) {
+    const v = src[k + 3] > 127 ? 255 : 0; if (v) painted++;
+    img.data[k] = img.data[k + 1] = img.data[k + 2] = v; img.data[k + 3] = 255;
+  }
+  o.putImageData(img, 0, 0);
+  return new Promise((resolve) => out.toBlob((blob) => resolve({ blob, painted, total: w * h }), "image/png"));
+}
+
+async function save() {
+  if (!state.image) return;
+  const file = state.files[state.index];
+  const { blob, painted, total } = await binaryPng();
+  if (!painted && !confirm("Mask đang trống (không có vùng lỗi). Vẫn lưu?")) return;
+  const name = maskName(file);
+  if (state.dirHandle) {
+    const handle = await state.dirHandle.getFileHandle(name, { create: true });
+    const writable = await handle.createWritable(); await writable.write(blob); await writable.close();
+  } else {
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  state.saved.add(file.name); state.dirty = false;
+  $("saveInfo").textContent = `Đã lưu ${name}: ${painted.toLocaleString("vi-VN")} px lỗi (${(100 * painted / total).toFixed(3)}% ảnh).`;
+  listFiles(); status();
+}
+
+$("save").addEventListener("click", save);
+$("prev").addEventListener("click", () => state.index > 0 && openImage(state.index - 1));
+$("next").addEventListener("click", () => state.index < state.files.length - 1 && openImage(state.index + 1));
+$("pick").addEventListener("change", (e) => {
+  state.files = [...e.target.files].sort((a, b) => a.name.localeCompare(b.name));
+  state.saved.clear(); state.dirty = false;
+  if (state.files.length) openImage(0); else listFiles();
+});
+$("pickDir").addEventListener("click", async () => {
+  if (!window.showDirectoryPicker) { alert("Trình duyệt này không hỗ trợ chọn thư mục; dùng Chrome hoặc Edge, hoặc lấy file từ Downloads."); return; }
+  try {
+    state.dirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+    $("dirInfo").textContent = `Lưu vào thư mục: ${state.dirHandle.name}`;
+    if (state.image) await tryLoadExisting(state.files[state.index]);
+    listFiles();
+  } catch (_) { /* cancelled */ }
+});
+$("loadMask").addEventListener("click", () => state.image && $("maskFile").click());
+$("maskFile").addEventListener("change", async (e) => {
+  if (!e.target.files[0]) return;
+  await pushUndo(); await drawMaskFile(e.target.files[0]); state.dirty = true; status(); e.target.value = "";
+});
+window.addEventListener("beforeunload", (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ""; } });
+resize();
+</script>
+</body>
+</html>
