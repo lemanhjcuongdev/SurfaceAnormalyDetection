@@ -1,9 +1,10 @@
 schema_version: "1.0"
 experiment_id: "internal_main_v1"
 protocol_locked_at: "2026-10-31"
-protocol_reference: "PROJECT_KNOWLEDGE D-096"
+protocol_reference: "PROJECT_KNOWLEDGE D-096, label definition D-102"
 registry: "data/metadata/INTERNAL_IMAGE_REGISTRY.xlsx"
 data_source: "internal_self_captured_s23plus"
+label_definition: "roi_only"   # D-102: NG only if a defect lies (at least partly) inside ROI-v0.1
 
 split:
   unit: "sample_id"            # every image of one physical sample stays in one split
