@@ -421,22 +421,6 @@ def main() -> None:
             low, high = boot["intervals"][metric]
             ablation_rows.append({"comparison": pair, "metric": metric, "difference": value, "ci_low": low, "ci_high": high})
 
-    # D-101 secondary analysis: all test OK + NG grouped by defect location vs ROI.
-    subgroup_rows = []
-    sub_cfg = config["metrics"]["subgroups"]
-    roi_values = np.asarray([metadata[i].get(sub_cfg["field"], "").strip().lower() for i in test_ids])
-    if all(roi_values[labels == 1]):
-        for subgroup in ("ng_defect_in_roi", "ng_defect_outside_roi"):
-            keep = (labels == 0) | np.isin(roi_values, sub_cfg[subgroup])
-            ng_count = int((labels[keep] == 1).sum())
-            for name, item in variants[primary].items():
-                row = {"subgroup": subgroup, "variant": name, "test_ok": int((labels[keep] == 0).sum()), "test_ng": ng_count}
-                if ng_count:
-                    row.update(image_metrics(labels[keep], item["scores"][keep], item["threshold"]))
-                subgroup_rows.append(row)
-        write_rows(args.run_dir / "subgroup_by_roi.csv", subgroup_rows)
-    run_meta["subgroup_by_roi_computed"] = bool(subgroup_rows)
-
     write_rows(args.run_dir / "table5_main_results.csv", main_rows)
     write_rows(args.run_dir / "table6_ablation.csv", ablation_rows)
     write_rows(args.run_dir / "seed_variability.csv", seed_rows)

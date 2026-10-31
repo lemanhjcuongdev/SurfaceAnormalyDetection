@@ -29,9 +29,8 @@ from validate_internal_split import UNSET, validate  # noqa: E402
 METADATA_COLUMNS = [
     "image_id", "parent_image_id", "sample_id", "coupon_id", "surface_region_id", "capture_session",
     "capture_role", "label", "data_source", "consent_or_data_status", "image_sha256", "annotation_path",
-    "image_path", "registry_sheet", "capture_qc_status", "defect_in_roi",
+    "image_path", "registry_sheet", "capture_qc_status",
 ]
-DEFECT_IN_ROI_VALUES = {"yes", "partial", "no"}
 
 
 def is_unset(value: Any) -> bool:
@@ -145,8 +144,6 @@ def metadata_row(row: dict[str, Any], data_root: Path, data_source: str) -> dict
         "image_path": str(image_path),
         "registry_sheet": text("registry_sheet"),
         "capture_qc_status": text("capture_qc_status"),
-        # D-101: only meaningful for NG images; OK images keep it empty.
-        "defect_in_roi": text("defect_in_roi").lower(),
     }
 
 
@@ -176,14 +173,6 @@ def main() -> None:
         writer.writerows({"image_id": row["image_id"], "split": assignments[row["image_id"]]} for row in metadata)
 
     result = validate(metadata, [{"image_id": k, "split": v} for k, v in assignments.items()])
-    test_ng = [row for row in metadata if assignments[row["image_id"]] == "test" and row["label"] == "NG"]
-    invalid_roi = [row["image_id"] for row in test_ng if row["defect_in_roi"] and row["defect_in_roi"] not in DEFECT_IN_ROI_VALUES]
-    if invalid_roi:
-        result["errors"].append(f"defect_in_roi phải là yes/partial/no: {invalid_roi[:5]}")
-        result["integrity_status"], result["experiment_ready"] = "FAIL", False
-    missing_roi = sum(not row["defect_in_roi"] for row in test_ng)
-    if missing_roi:
-        result["warnings"].append(f"{missing_roi} ảnh NG test chưa có defect_in_roi; phân tích phụ theo ROI (D-101) sẽ bị bỏ qua.")
     result.update({
         "checked_at_utc": datetime.now(timezone.utc).isoformat(),
         "protocol": "D-096",
@@ -207,7 +196,6 @@ def main() -> None:
         "other_errors": [e for e in result["errors"] if ": thiếu " not in e][:5],
         "calibration_samples": report["calibration_samples"],
         "conflict_excluded": len(report["conflict_excluded_images"]),
-        "warnings": result["warnings"],
     }, ensure_ascii=False, indent=2))
 
 
