@@ -1,7 +1,7 @@
 schema_version: "1.0"
 experiment_id: "internal_main_v1"
 protocol_locked_at: "2026-10-31"
-protocol_reference: "PROJECT_KNOWLEDGE D-096, label definition D-102"
+protocol_reference: "PROJECT_KNOWLEDGE D-096, label definition D-102, required fields D-104"
 registry: "data/metadata/INTERNAL_IMAGE_REGISTRY.xlsx"
 data_source: "internal_self_captured_s23plus"
 label_definition: "roi_only"   # D-102: NG only if a defect lies (at least partly) inside ROI-v0.1
@@ -14,7 +14,7 @@ split:
   calibration_excluded_sessions: ["20261016-S06"]   # auto exposure: model or test_OK_auto_exposure only
   seed: 42
   conflict_rule: "If a sample_id appears in both test and development sessions, its development-session images become excluded."
-  required_fields: ["sample_id", "surface_region_id", "capture_session", "label", "consent_or_data_status"]
+  required_fields: ["sample_id", "capture_session", "label", "consent_or_data_status"]   # D-104: surface_region_id optional
 
 variants:
   A: {model: "Patchcore", input: "full_frame", roi: null}

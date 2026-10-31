@@ -172,7 +172,9 @@ def main() -> None:
         writer.writeheader()
         writer.writerows({"image_id": row["image_id"], "split": assignments[row["image_id"]]} for row in metadata)
 
-    result = validate(metadata, [{"image_id": k, "split": v} for k, v in assignments.items()])
+    # D-104: required fields come from the locked config; data_source is always required.
+    required = tuple(dict.fromkeys([*config["split"]["required_fields"], "data_source"]))
+    result = validate(metadata, [{"image_id": k, "split": v} for k, v in assignments.items()], required)
     result.update({
         "checked_at_utc": datetime.now(timezone.utc).isoformat(),
         "protocol": "D-096",

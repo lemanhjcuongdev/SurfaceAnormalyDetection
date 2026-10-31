@@ -128,6 +128,20 @@ class ValidateInternalSplitTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(result["integrity_status"], "PASS")
 
+    def test_surface_region_can_be_optional_but_still_cannot_cross_splits(self) -> None:
+        sys.path.insert(0, str(SCRIPT.parent))
+        from validate_internal_split import validate
+
+        rows = example_rows()
+        for row in rows:
+            row["surface_region_id"] = "TBD"
+        assignments = [{"image_id": row["image_id"], "split": row["split"]} for row in rows]
+        required = ("sample_id", "capture_session", "data_source")
+        self.assertEqual(validate(rows, assignments, required)["integrity_status"], "PASS")
+        self.assertEqual(validate(rows, assignments)["integrity_status"], "FAIL")  # default stays strict
+        rows[0]["surface_region_id"] = rows[2]["surface_region_id"] = "REGION-X"
+        self.assertEqual(validate(rows, assignments, required)["integrity_status"], "FAIL")
+
     def test_child_and_parent_must_share_split(self) -> None:
         rows = example_rows()
         rows[2]["parent_image_id"] = rows[0]["image_id"]

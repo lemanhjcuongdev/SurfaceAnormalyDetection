@@ -79,8 +79,13 @@ def group_overlap(
     }
 
 
+DEFAULT_REQUIRED_FIELDS = ("sample_id", "surface_region_id", "capture_session", "data_source")
+
+
 def validate(
-    metadata: list[dict[str, str]], assignment_rows: list[dict[str, str]]
+    metadata: list[dict[str, str]],
+    assignment_rows: list[dict[str, str]],
+    required_fields: tuple[str, ...] = DEFAULT_REQUIRED_FIELDS,
 ) -> dict[str, object]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -117,7 +122,7 @@ def validate(
     for row in active_rows:
         image_id = row["image_id"].strip()
         split = assignments[image_id]
-        for field in ("sample_id", "surface_region_id", "capture_session", "data_source"):
+        for field in required_fields:
             if row[field].strip().lower() in UNSET:
                 errors.append(f"{image_id}: thiếu {field}")
         if row["capture_role"].strip() != "dataset_candidate":
