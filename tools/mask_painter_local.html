@@ -218,6 +218,8 @@ view.addEventListener("pointermove", (e) => {
   if (state.drawing) { stroke(state.last, p); state.last = p; }
   render();
 });
+// Chrome reports detail = 0 on pointerdown, so a double-click is caught by its own event.
+view.addEventListener("dblclick", async () => { if (state.tool === "poly" && state.poly.length) await closePolygon(); });
 const endPointer = () => { state.drawing = false; state.panning = false; };
 view.addEventListener("pointerup", endPointer);
 view.addEventListener("pointerleave", () => { state.cursor = null; render(); });
