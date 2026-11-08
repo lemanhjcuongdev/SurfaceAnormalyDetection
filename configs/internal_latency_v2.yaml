@@ -1,0 +1,26 @@
+schema_version: "1.0"
+experiment_id: "internal_latency_v2"
+protocol_locked_at: "2026-11-07"
+protocol: "D-129"
+protocol_reference: "PROJECT_KNOWLEDGE D-129; measurement steps follow D-083"
+base_config: "configs/internal_main_experiment_v2.yaml"
+efficientad_config: "configs/internal_efficientad_v2.yaml"
+reference_run: "runs/internal_main_v2/20261107-run01"
+efficientad_run: "runs/internal_main_v2/20261107-efficientad01"
+input_split: "test"
+input_order: "sorted_by_image_id"
+labels_read: false
+hardware_id: "acer_nitro_anv15_41"
+devices: ["cuda", "cpu"]
+precision: "float32"
+batch_size: 1
+seed: 42
+warmup_image_count: 10
+measured_passes: 3
+percentile_method: "nearest_rank"
+validity:
+  cuda_max_relative_score_difference: 0.001
+  cpu_max_relative_score_difference: 0.01
+  require_same_decisions: true
+  require_ac_power: true
+selection_policy: "Latency and memory results never select model, threshold, ROI or post-processing parameters."
