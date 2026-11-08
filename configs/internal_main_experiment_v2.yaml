@@ -1,0 +1,52 @@
+schema_version: "1.0"
+experiment_id: "internal_main_v2"
+protocol_locked_at: "2026-11-07"
+protocol: "D-126"
+protocol_reference: "PROJECT_KNOWLEDGE D-126 (deviation from D-096), relabelling D-125, label definition D-102, required fields D-104"
+registry: "data/metadata/INTERNAL_IMAGE_REGISTRY.xlsx"
+data_source: "internal_self_captured_s23plus"
+label_definition: "roi_only"   # D-102: NG only if a defect lies (at least partly) inside ROI-v0.1
+
+split:
+  unit: "sample_id"            # every image of one physical sample stays in one split
+  pinned_from: "data/manifests/internal_v1"   # sample assignments are not reshuffled
+  relabelled_list: "data/manifests/internal_v2/relabelled_ng_s04_s07.csv"   # these become excluded
+  test_sessions: ["20261029-S08", "20261030-S09"]   # held out; all NG come from here
+  development_sessions: ["20261009-S04", "20261013-S05", "20261016-S06", "20261023-S07"]
+  calibration_fraction_of_samples: 0.20
+  calibration_excluded_sessions: ["20261016-S06"]   # auto exposure: model or test_OK_auto_exposure only
+  seed: 42
+  conflict_rule: "If a sample_id appears in both test and development sessions, its development-session images become excluded."
+  required_fields: ["sample_id", "capture_session", "label", "consent_or_data_status"]   # D-104: surface_region_id optional
+
+variants:
+  A: {model: "Patchcore", input: "full_frame", roi: null}
+  B: {model: "Patchcore", input: "roi", roi: [0, 0, 3000, 1957]}
+  C: {base: "B", image_threshold: "normal_only_q95_nearest_rank"}
+  D: {base: "C", postprocessing: "fixed_3x3_binomial", image_score: "maximum_of_smoothed_anomaly_map"}
+  E: {model: "Padim", input: "roi", roi: [0, 0, 3000, 1957], image_threshold: "normal_only_q95_nearest_rank"}
+input_size: [256, 256]
+patchcore: {backbone: "wide_resnet50_2", layers: ["layer2", "layer3"], coreset_sampling_ratio: 0.10, num_neighbors: 9}
+padim: {backbone: "resnet18", layers: ["layer1", "layer2", "layer3"]}
+model_seeds: [42, 43, 44]
+primary_seed: 42
+
+metrics:
+  image: ["image_auroc", "image_auprc", "tp", "fp", "fn", "tn", "fpr", "recall", "precision", "f1"]
+  thresholded_variants: ["C", "D", "E"]
+  pixel: ["pixel_auroc"]
+  pixel_variants: ["B", "D", "E"]
+  pixel_requires_masks: true
+  pixel_in_main_run: false     # pixel metrics come from run_internal_localization.py (binned bootstrap)
+  confidence_interval: {method: "cluster_bootstrap_by_sample_id", resamples: 2000, level: 0.95, seed: 42}
+  ablation_differences: ["B-A", "C-B", "D-C"]
+
+error_cases:
+  variant: "D"
+  include: ["all_false_negatives", "all_false_positives", "three_lowest_scored_ng"]
+  outputs_local_only: true
+
+gates:
+  run_only_if: "validate_internal_split integrity_status PASS and experiment_ready true"
+  efficientad: "TBD until the researcher defines Nhanh 2"
+selection_policy: "Test labels, scores, masks and heatmaps never select ROI, input size, threshold, post-processing or seeds."

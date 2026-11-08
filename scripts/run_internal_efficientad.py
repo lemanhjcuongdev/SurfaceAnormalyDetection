@@ -192,7 +192,7 @@ def main() -> None:
     meta: dict[str, Any] = {
         "status": "running",
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
-        "protocol": "D-109",
+        "protocol": config.get("protocol", "D-109"),
         "official_run": official,
         "command": [sys.executable, *sys.argv],
         "config_sha256": sha256_file(args.config),

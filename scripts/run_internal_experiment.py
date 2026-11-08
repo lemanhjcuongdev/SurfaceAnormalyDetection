@@ -284,7 +284,7 @@ def main() -> None:
     run_meta: dict[str, Any] = {
         "status": "running",
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
-        "protocol": "D-096",
+        "protocol": config.get("protocol", "D-096"),
         "official_run": official,
         "command": [sys.executable, *sys.argv],
         "config_sha256": sha256_file(args.config),
@@ -364,7 +364,7 @@ def main() -> None:
     labels = np.asarray([1 if metadata[i]["label"] == "NG" else 0 for i in test_ids], dtype=np.uint8)
     groups = np.asarray([metadata[i]["sample_id"] for i in test_ids])
     mask_paths = [metadata[i]["annotation_path"].strip() for i in test_ids]
-    ng_with_mask = all(mask_paths[k] for k in np.flatnonzero(labels == 1))
+    ng_with_mask = config["metrics"].get("pixel_in_main_run", True) and all(mask_paths[k] for k in np.flatnonzero(labels == 1))
     masks = None
     if ng_with_mask:
         masks = np.stack([

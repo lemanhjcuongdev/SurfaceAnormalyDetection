@@ -1,0 +1,28 @@
+schema_version: "1.0"
+experiment_id: "internal_robustness_v2"
+protocol_locked_at: "2026-11-07"
+protocol: "D-126"
+protocol_reference: "PROJECT_KNOWLEDGE D-126, conditions D-116"
+base_config: "configs/internal_main_experiment_v2.yaml"          # split, ROI, input size, models, bootstrap
+efficientad_config: "configs/internal_efficientad_v2.yaml"
+reference_run: "runs/internal_main_v2/20261107-run01"
+efficientad_run: "runs/internal_main_v2/20261107-efficientad01"
+seed: 42
+
+# Applied to the EXIF-transposed full frame, before ROI crop and resize. Evaluation only.
+conditions:
+  nominal: {}
+  brightness_x0.8: {gain: 0.8}
+  brightness_x0.9: {gain: 0.9}
+  brightness_x1.1: {gain: 1.1}
+  brightness_x1.2: {gain: 1.2}
+  light_gradient_x: {gain_x: [0.85, 1.15]}
+  shift_x_plus60: {dx: 60}
+  shift_x_minus60: {dx: -60}
+  shift_y_plus39: {dy: 39}
+  shift_y_minus39: {dy: -39}
+  rotate_plus2: {rotate_deg: 2}
+  rotate_minus2: {rotate_deg: -2}
+
+reproduction_gate: {max_relative_difference: 0.001}
+pixel_bins: 4096

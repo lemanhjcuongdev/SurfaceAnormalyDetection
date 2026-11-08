@@ -1,0 +1,33 @@
+schema_version: "1.0"
+experiment_id: "internal_efficientad_v2"
+protocol_locked_at: "2026-11-07"
+protocol: "D-126"
+protocol_reference: "PROJECT_KNOWLEDGE D-126, model settings D-109"
+base_config: "configs/internal_main_experiment_v2.yaml"   # split, ROI, input size, bootstrap
+
+variant:
+  F: {model: "EfficientAd", input: "roi", roi: [0, 0, 3000, 1957], image_threshold: "normal_only_q95_nearest_rank"}
+
+efficientad:
+  model_size: "small"
+  teacher_out_channels: 384
+  padding: false
+  pad_maps: true
+  input_normalization: "none"          # EfficientAD expects [0, 1] inputs
+  steps: 70000
+  lr: 0.0001
+  weight_decay: 0.00001
+  lr_decay_at_fraction: 0.95
+  lr_decay_gamma: 0.1
+  batch_size: 1
+  teacher_mean_std_split: "model"
+  map_quantiles_split: "calibration"   # normal-only, plays the paper's validation-set role
+  image_score: "max_of_anomaly_map"
+  seed: 42
+  teacher_weights_dir: "C:/Users/cuong/datasets/efficientad/efficientad_pretrained_weights"
+  imagenette_dir: "C:/Users/cuong/datasets/imagenette"
+
+comparisons:
+  reference_run: "runs/internal_main_v2/20261107-run01"
+  paired: {"F-B": "raw_patchcore_roi_seed42.npz", "F-E": "raw_padim_roi_seed42.npz"}
+  metrics: ["image_auroc", "image_auprc"]
